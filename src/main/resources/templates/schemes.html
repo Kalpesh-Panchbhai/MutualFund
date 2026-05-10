@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mutual Fund Analysis</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #1a1a2e;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+
+        .header .count {
+            background: rgba(255,255,255,0.15);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+        }
+
+        .toolbar {
+            padding: 16px 32px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .toolbar input, .toolbar select {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            outline: none;
+        }
+
+        .toolbar input:focus, .toolbar select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        .toolbar input[type="text"] { width: 300px; }
+
+        .toolbar .result-info {
+            margin-left: auto;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            padding: 14px 32px;
+            flex-wrap: wrap;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 6px;
+            font-size: 0.8125rem;
+            cursor: pointer;
+            color: #334155;
+        }
+
+        .pagination button:hover:not(:disabled) { background: #f1f5f9; }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .pagination button.active {
+            background: #1a1a2e;
+            color: white;
+            border-color: #1a1a2e;
+        }
+
+        .pagination .page-info {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin: 0 8px;
+        }
+
+        .container { padding: 16px 32px; }
+
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            overflow: auto;
+            max-height: calc(100vh - 200px);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+        }
+
+        thead th {
+            background: #f8fafc;
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        thead th:hover { background: #eef2f7; }
+
+        tbody td {
+            padding: 8px 14px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        tbody tr:hover { background: #f8fafc; }
+
+        .code { color: #64748b; font-family: monospace; }
+
+        .nav-value { font-weight: 500; text-align: right; }
+
+        .cagr-value { font-weight: 600; text-align: right; white-space: nowrap; }
+        .cagr-positive { color: #059669; }
+        .cagr-negative { color: #dc2626; }
+        .cagr-na { color: #94a3b8; font-style: italic; }
+        .cagr-loading { color: #94a3b8; font-size: 0.75rem; }
+
+        .progress-bar-container {
+            padding: 10px 32px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: none;
+        }
+        .progress-bar-container.active { display: block; }
+        .progress-label {
+            font-size: 0.8rem;
+            color: #475569;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .progress-track {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #059669);
+            border-radius: 4px;
+            transition: width 0.15s ease;
+            width: 0%;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-type { background: #ede9fe; color: #7c3aed; }
+        .badge-cat { background: #dbeafe; color: #2563eb; }
+        .badge-sub { background: #d1fae5; color: #059669; }
+
+        .error-box {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 32px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Mutual Fund Analysis — India</h1>
+        <div class="count" th:if="${totalCount}">
+            <span th:text="${totalCount}"></span> schemes loaded
+        </div>
+    </div>
+
+    <div th:if="${error}" class="error-box" th:text="${error}"></div>
+
+    <div th:if="${schemes}">
+        <div class="toolbar">
+            <input type="text" id="searchInput" placeholder="Search by name, fund house, or code..." onkeyup="filterTable()">
+            <select id="categoryFilter" onchange="onCategoryChange()">
+                <option value="">All Categories</option>
+            </select>
+            <select id="subCategoryFilter" onchange="filterTable()">
+                <option value="">All Sub-Categories</option>
+            </select>
+            <select id="fundHouseFilter" onchange="filterTable()">
+                <option value="">All Fund Houses</option>
+            </select>
+            <select id="pageSizeSelect" onchange="changePageSize()">
+                <option value="10">10 per page</option>
+                <option value="20" selected>20 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+            </select>
+            <span class="result-info" id="resultInfo"></span>
+        </div>
+
+        <div class="progress-bar-container" id="progressContainer">
+            <div class="progress-label">
+                <span id="progressText">Fetching CAGR 1Y data...</span>
+                <span id="progressCount">0 / 0</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="table-wrapper">
+                <table id="schemeTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable(0)">Code</th>
+                            <th onclick="sortTable(1)">Scheme Name</th>
+                            <th onclick="sortTable(2)">Fund House</th>
+                            <th onclick="sortTable(3)">Type</th>
+                            <th onclick="sortTable(4)">Category</th>
+                            <th onclick="sortTable(5)">Sub-Category</th>
+                            <th onclick="sortTable(6)">NAV</th>
+                            <th onclick="sortTable(7)">Date</th>
+                            <th onclick="sortTable(8)">CAGR 1Y (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schemeBody">
+                        <tr th:each="s : ${schemes}">
+                            <td class="code" th:text="${s.code}"></td>
+                            <td th:text="${s.name}"></td>
+                            <td th:text="${s.fundHouse}"></td>
+                            <td><span class="badge badge-type" th:text="${s.schemeType}"></span></td>
+                            <td><span class="badge badge-cat" th:text="${s.category}"></span></td>
+                            <td><span class="badge badge-sub" th:text="${s.subCategory}" th:if="${s.subCategory != ''}"></span></td>
+                            <td class="nav-value" th:text="${s.nav}"></td>
+                            <td th:text="${s.date}"></td>
+                            <td class="cagr-value cagr-loading" th:attr="data-code=${s.code}">—</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let pageSize = 20;
+        let filteredRows = [];
+
+        // Populate filter dropdowns
+        (function() {
+            const rows = document.querySelectorAll('#schemeBody tr');
+            const categories = new Set();
+            const fundHouses = new Set();
+            rows.forEach(row => {
+                const cells = row.getElementsByTagName('td');
+                if (cells.length >= 6) {
+                    const cat = cells[4].textContent.trim();
+                    const fh = cells[2].textContent.trim();
+                    if (cat) categories.add(cat);
+                    if (fh) fundHouses.add(fh);
+                }
+            });
+            const catSelect = document.getElementById('categoryFilter');
+            [...categories].sort().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.textContent = c;
+                catSelect.appendChild(opt);
+            });
+            const fhSelect = document.getElementById('fundHouseFilter');
+            [...fundHouses].sort().forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f; opt.textContent = f;
+                fhSelect.appendChild(opt);
+            });
+            filterTable();
+        })();
+
+        function populateSubCategories() {
+            const catFilter = document.getElementById('categoryFilter').value;
+            const rows = document.querySelectorAll('#schemeBody tr');
+            const subCategories = new Set();
+            rows.forEach(row => {
+                const cells = row.getElementsByTagName('td');
+                if (cells.length >= 6) {
+                    const cat = cells[4].textContent.trim();
+                    const sub = cells[5].textContent.trim();
+                    if ((!catFilter || cat === catFilter) && sub) subCategories.add(sub);
+                }
+            });
+            const subSelect = document.getElementById('subCategoryFilter');
+            subSelect.innerHTML = '<option value="">All Sub-Categories</option>';
+            [...subCategories].sort().forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s; opt.textContent = s;
+                subSelect.appendChild(opt);
+            });
+        }
+
+        function onCategoryChange() {
+            populateSubCategories();
+            filterTable();
+        }
+
+        function filterTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const catFilter = document.getElementById('categoryFilter').value;
+            const subCatFilter = document.getElementById('subCategoryFilter').value;
+            const fhFilter = document.getElementById('fundHouseFilter').value;
+            const rows = document.querySelectorAll('#schemeBody tr');
+
+            filteredRows = [];
+            rows.forEach(row => {
+                const cells = row.getElementsByTagName('td');
+                const code = cells[0].textContent.toLowerCase();
+                const name = cells[1].textContent.toLowerCase();
+                const fh = cells[2].textContent.trim();
+                const cat = cells[4].textContent.trim();
+                const sub = cells[5].textContent.trim();
+
+                const matchSearch = !search || name.includes(search) || fh.toLowerCase().includes(search) || code.includes(search);
+                const matchCat = !catFilter || cat === catFilter;
+                const matchSub = !subCatFilter || sub === subCatFilter;
+                const matchFh = !fhFilter || fh === fhFilter;
+
+                if (matchSearch && matchCat && matchSub && matchFh) {
+                    filteredRows.push(row);
+                }
+            });
+            currentPage = 1;
+            renderPage();
+        }
+
+        function renderPage() {
+            const rows = document.querySelectorAll('#schemeBody tr');
+            rows.forEach(r => r.style.display = 'none');
+
+            const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const start = (currentPage - 1) * pageSize;
+            const end = Math.min(start + pageSize, filteredRows.length);
+            for (let i = start; i < end; i++) {
+                filteredRows[i].style.display = '';
+            }
+
+            document.getElementById('resultInfo').textContent =
+                'Showing ' + (filteredRows.length === 0 ? 0 : start + 1) + '–' + end + ' of ' + filteredRows.length + ' (total ' + rows.length + ')';
+            renderPagination(totalPages);
+        }
+
+        function renderPagination(totalPages) {
+            const container = document.getElementById('pagination');
+            container.innerHTML = '';
+            if (totalPages <= 1) return;
+
+            const addBtn = (label, page, disabled, active) => {
+                const btn = document.createElement('button');
+                btn.textContent = label;
+                btn.disabled = disabled;
+                if (active) btn.className = 'active';
+                btn.onclick = () => { currentPage = page; renderPage(); };
+                container.appendChild(btn);
+            };
+
+            addBtn('«', 1, currentPage === 1, false);
+            addBtn('‹', currentPage - 1, currentPage === 1, false);
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+            for (let i = startPage; i <= endPage; i++) {
+                addBtn(i, i, false, i === currentPage);
+            }
+
+            addBtn('›', currentPage + 1, currentPage === totalPages, false);
+            addBtn('»', totalPages, currentPage === totalPages, false);
+
+            const info = document.createElement('span');
+            info.className = 'page-info';
+            info.textContent = 'Page ' + currentPage + ' of ' + totalPages;
+            container.appendChild(info);
+        }
+
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+            currentPage = 1;
+            renderPage();
+        }
+
+        let sortDir = {};
+        function sortTable(colIdx) {
+            const tbody = document.getElementById('schemeBody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            sortDir[colIdx] = !sortDir[colIdx];
+            const dir = sortDir[colIdx] ? 1 : -1;
+
+            rows.sort((a, b) => {
+                let aVal = a.cells[colIdx].textContent.trim();
+                let bVal = b.cells[colIdx].textContent.trim();
+                if (colIdx === 0 || colIdx === 6 || colIdx === 8) {
+                    let aNum = parseFloat(aVal);
+                    let bNum = parseFloat(bVal);
+                    if (isNaN(aNum)) aNum = -Infinity;
+                    if (isNaN(bNum)) bNum = -Infinity;
+                    return dir * (aNum - bNum);
+                }
+                return dir * aVal.localeCompare(bVal);
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        }
+        // SSE: stream CAGR data with progress
+        (function() {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressText = document.getElementById('progressText');
+            const progressCount = document.getElementById('progressCount');
+            const progressFill = document.getElementById('progressFill');
+            progressContainer.classList.add('active');
+
+            const codeToCell = {};
+            document.querySelectorAll('#schemeBody td[data-code]').forEach(td => {
+                codeToCell[td.getAttribute('data-code')] = td;
+            });
+
+            const evtSource = new EventSource('/api/cagr-stream');
+
+            evtSource.addEventListener('cagr', function(e) {
+                const d = JSON.parse(e.data);
+                const pct = Math.round((d.fetched / d.total) * 100);
+                progressFill.style.width = pct + '%';
+                progressCount.textContent = d.fetched + ' / ' + d.total;
+                progressText.textContent = 'Fetching CAGR 1Y data... ' + pct + '%';
+
+                const td = codeToCell[String(d.code)];
+                if (td) {
+                    td.classList.remove('cagr-loading');
+                    if (d.cagr !== null) {
+                        td.textContent = d.cagr.toFixed(2);
+                        td.classList.add(d.cagr >= 0 ? 'cagr-positive' : 'cagr-negative');
+                    } else {
+                        td.textContent = 'N/A';
+                        td.classList.add('cagr-na');
+                    }
+                }
+            });
+
+            evtSource.addEventListener('done', function(e) {
+                const d = JSON.parse(e.data);
+                progressText.textContent = 'CAGR 1Y data loaded ✓';
+                progressCount.textContent = d.fetched + ' / ' + d.total;
+                progressFill.style.width = '100%';
+                evtSource.close();
+                setTimeout(() => {
+                    progressContainer.style.transition = 'opacity 0.5s';
+                    progressContainer.style.opacity = '0';
+                    setTimeout(() => progressContainer.classList.remove('active'), 500);
+                }, 2000);
+            });
+
+            evtSource.onerror = function() {
+                progressText.textContent = 'CAGR fetch interrupted';
+                progressFill.style.background = '#dc2626';
+                evtSource.close();
+            };
+        })();
+    </script>
+</body>
+</html>
